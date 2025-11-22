@@ -43,4 +43,83 @@ with st.sidebar:
 
     selected_athlete = st.selectbox("선수 선택", athletes)
     selected_event = st.multiselect("종목 선택", events, default=events)
-    selected_year = st.multiselect("연도 선택",_
+    selected_year = st.multiselect("연도 선택", sorted(df["연도"].unique()), default=df["연도"].unique())
+
+    show_raw = st.checkbox("📄 원본 데이터 보기")
+
+# --- 4. 데이터 필터링 ---
+filtered = df[
+    (df["선수"] == selected_athlete) &
+    (df["종목"].isin(selected_event)) &
+    (df["연도"].isin(selected_year))
+]
+
+st.subheader(f"📊 {selected_athlete} 선수의 성과 요약")
+
+# --- 5. KPI 카드 ---
+best_record = filtered["기록"].min()
+recent_record = filtered[filtered["연도"] == filtered["연도"].max()]["기록"].mean()
+
+col1, col2 = st.columns(2)
+col1.metric("🏅 최고 기록", f"{best_record}")
+col2.metric("📉 최근 평균 기록", f"{round(recent_record, 2)}")
+
+st.divider()
+
+# --- 6. 시각화: 연도별 기록 추세 ---
+st.subheader("📈 연도별 기록 변화")
+
+fig_line = px.line(
+    filtered,
+    x="연도",
+    y="기록",
+    color="종목",
+    markers=True
+)
+fig_line.update_layout(height=450)
+st.plotly_chart(fig_line, use_container_width=True)
+
+st.divider()
+
+# --- 7. 시각화: 선수 종목별 능력 레이더 차트 ---
+st.subheader("🕸 종목별 능력 레이더 차트")
+
+radar_data = df[df["선수"] == selected_athlete].groupby("종목")["기록"].mean().reset_index()
+
+fig_radar = go.Figure()
+fig_radar.add_trace(go.Scatterpolar(
+    r = radar_data["기록"],
+    theta = radar_data["종목"],
+    fill='toself',
+    name=selected_athlete
+))
+
+fig_radar.update_layout(
+    polar=dict(radialaxis=dict(visible=True)),
+    showlegend=False,
+    height=500
+)
+
+st.plotly_chart(fig_radar, use_container_width=True)
+
+st.divider()
+
+# --- 8. 전체 선수 종목 비교 ---
+st.subheader("🏆 선수별 종목 평균 기록 비교")
+
+compare_df = df.groupby(["선수", "종목"])["기록"].mean().reset_index()
+
+fig_bar = px.bar(
+    compare_df,
+    x="종목",
+    y="기록",
+    color="선수",
+    barmode="group"
+)
+st.plotly_chart(fig_bar, use_container_width=True)
+
+# --- 9. 원본 데이터 ---
+if show_raw:
+    st.subheader("📄 원본 데이터")
+    st.dataframe(filtered, use_container_width=True)
+
